@@ -1,4 +1,3 @@
-
 # 🍅 Ketchup (Frontend): The Centralized Planning Portal
 
 Ketchup is the user-facing interface of the autonomous social coordination platform. It replaces scattered group chat threads with a centralized dashboard where friend groups can vote on AI-generated plans, view personalized carpooling logistics, and provide feedback on their experiences.
