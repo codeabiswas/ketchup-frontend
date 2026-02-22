@@ -10,6 +10,10 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
 
 const BACKEND_URL = process.env.BACKEND_URL || "http://localhost:8000";
+const BACKEND_INTERNAL_API_KEY = process.env.BACKEND_INTERNAL_API_KEY || "";
+const BACKEND_REQUEST_TIMEOUT_MS = Number(
+  process.env.BACKEND_REQUEST_TIMEOUT_MS || "360000",
+);
 
 export async function GET(
   request: NextRequest,
@@ -65,6 +69,10 @@ async function proxyRequest(
     "Content-Type": request.headers.get("Content-Type") || "application/json",
   };
 
+  if (BACKEND_INTERNAL_API_KEY) {
+    headers["X-Internal-Auth"] = BACKEND_INTERNAL_API_KEY;
+  }
+
   // Inject X-User-Id if user is authenticated
   if (userId) {
     headers["X-User-Id"] = userId;
@@ -73,7 +81,13 @@ async function proxyRequest(
   try {
     const body =
       method !== "GET" && method !== "HEAD" ? await request.text() : undefined;
-    const res = await fetch(targetUrl, { method, headers, body });
+    const signal = AbortSignal.timeout(BACKEND_REQUEST_TIMEOUT_MS);
+    const res = await fetch(targetUrl, {
+      method,
+      headers,
+      body,
+      signal,
+    });
     const data = await res.text();
     return new NextResponse(data, {
       status: res.status,
