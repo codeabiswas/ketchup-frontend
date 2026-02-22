@@ -1,3 +1,5 @@
+// src/app/groups/[id]/events/[eventId]/feedback/page.tsx
+
 "use client";
 
 import { useEffect, useState } from "react";
@@ -51,7 +53,13 @@ export default function FeedbackPage() {
 
   return (
     <Container size="sm" py={40}>
-      <Button component={Link} href={`/groups/${id}`} variant="subtle" size="xs" mb="md">
+      <Button
+        component={Link}
+        href={`/groups/${id}`}
+        variant="subtle"
+        size="xs"
+        mb="md"
+      >
         ← Back to Group
       </Button>
       <Title order={2} mb="xl">

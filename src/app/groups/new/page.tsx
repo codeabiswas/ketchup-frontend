@@ -1,3 +1,5 @@
+// src/app/groups/new/page.tsx
+
 "use client";
 
 import { useState } from "react";
@@ -25,7 +27,9 @@ export default function NewGroupPage() {
     setLoading(true);
     setError("");
     try {
-      const res = await apiPost<{ group_id: string }>("groups", { name: name.trim() });
+      const res = await apiPost<{ group_id: string }>("groups", {
+        name: name.trim(),
+      });
       router.push(`/groups/${res.group_id}`);
     } catch (e) {
       setError(String(e));
@@ -47,7 +51,11 @@ export default function NewGroupPage() {
             value={name}
             onChange={(e) => setName(e.target.value)}
           />
-          {error && <Text c="red" size="sm">{error}</Text>}
+          {error && (
+            <Text c="red" size="sm">
+              {error}
+            </Text>
+          )}
           <Group>
             <Button onClick={handleCreate} loading={loading} color="red">
               Create

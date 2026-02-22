@@ -1,3 +1,5 @@
+// src/app/groups/[id]/vote/[roundId]/results/page.tsx
+
 "use client";
 
 import { useEffect, useState } from "react";
@@ -41,11 +43,6 @@ export default function VoteResultsPage() {
   const [error, setError] = useState("");
 
   useEffect(() => {
-    const userId = sessionStorage.getItem("ketchup_dev_user_id");
-    if (!userId) {
-      router.push("/");
-      return;
-    }
     Promise.all([
       apiGet<ResultsData>(`groups/${id}/plans/${roundId}/results`),
       apiGet<{ plans: Plan[] }>(`groups/${id}/plans/${roundId}`),
@@ -95,7 +92,13 @@ export default function VoteResultsPage() {
 
   return (
     <Container size="md" py={40}>
-      <Button component={Link} href={`/groups/${id}`} variant="subtle" size="xs" mb="md">
+      <Button
+        component={Link}
+        href={`/groups/${id}`}
+        variant="subtle"
+        size="xs"
+        mb="md"
+      >
         ← Back to Group
       </Button>
       <Title order={2} mb="xl">
@@ -126,7 +129,8 @@ export default function VoteResultsPage() {
             No consensus yet
           </Badge>
           <Text>
-            Not enough votes for a clear winner. Try refining to get 5 new options.
+            Not enough votes for a clear winner. Try refining to get 5 new
+            options.
           </Text>
           <Button
             mt="md"
@@ -144,7 +148,9 @@ export default function VoteResultsPage() {
           Vote summary
         </Title>
         {Object.keys(results.vote_summary).length === 0 ? (
-          <Text c="dimmed" size="sm">No votes yet.</Text>
+          <Text c="dimmed" size="sm">
+            No votes yet.
+          </Text>
         ) : (
           <Stack gap="xs">
             {Object.entries(results.vote_summary).map(([planId, count]) => {
@@ -152,7 +158,9 @@ export default function VoteResultsPage() {
               return (
                 <Group key={planId} justify="space-between">
                   <Text size="sm">{plan?.title || planId}</Text>
-                  <Badge>{count} vote{count !== 1 ? "s" : ""}</Badge>
+                  <Badge>
+                    {count} vote{count !== 1 ? "s" : ""}
+                  </Badge>
                 </Group>
               );
             })}

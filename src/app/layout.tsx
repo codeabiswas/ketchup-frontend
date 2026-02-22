@@ -1,8 +1,11 @@
+// src/app/layout.tsx
+
 import type { Metadata } from "next";
 import { MantineProvider } from "@mantine/core";
 import "@mantine/core/styles.css";
 import "../styles/globals.css";
 import { AppShellNav } from "@/components/AppShellNav";
+import { SessionProvider } from "next-auth/react";
 
 export const metadata: Metadata = {
   title: "Ketchup - Social Coordination",
@@ -17,9 +20,11 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body>
-        <MantineProvider defaultColorScheme="light">
-          <AppShellNav>{children}</AppShellNav>
-        </MantineProvider>
+        <SessionProvider>
+          <MantineProvider defaultColorScheme="light">
+            <AppShellNav>{children}</AppShellNav>
+          </MantineProvider>
+        </SessionProvider>
       </body>
     </html>
   );

@@ -1,3 +1,5 @@
+// src/app/groups/[id]/vote/[roundId]/page.tsx
+
 "use client";
 
 import { useEffect, useState } from "react";
@@ -46,11 +48,6 @@ export default function VotePage() {
   const [error, setError] = useState("");
 
   useEffect(() => {
-    const userId = sessionStorage.getItem("ketchup_dev_user_id");
-    if (!userId) {
-      router.push("/");
-      return;
-    }
     apiGet<PlansData>(`groups/${id}/plans/${roundId}`)
       .then(setData)
       .catch((e) => setError(String(e)))
@@ -108,14 +105,21 @@ export default function VotePage() {
 
   return (
     <Container size="md" py={40}>
-      <Button component={Link} href={`/groups/${id}`} variant="subtle" size="xs" mb="md">
+      <Button
+        component={Link}
+        href={`/groups/${id}`}
+        variant="subtle"
+        size="xs"
+        mb="md"
+      >
         ← Back to Group
       </Button>
       <Title order={2} mb="xl">
         Vote on Plans
       </Title>
       <Text c="dimmed" mb="xl">
-        Rank the 5 options from most preferred (1) to least (5). Click plans in order.
+        Rank the 5 options from most preferred (1) to least (5). Click plans in
+        order.
       </Text>
 
       <Stack gap="md">
@@ -130,7 +134,9 @@ export default function VotePage() {
               withBorder
               style={{
                 cursor: "pointer",
-                borderColor: selected ? "var(--mantine-color-red-6)" : undefined,
+                borderColor: selected
+                  ? "var(--mantine-color-red-6)"
+                  : undefined,
                 borderWidth: selected ? 2 : 1,
               }}
               onClick={() => handleRank(plan.id)}

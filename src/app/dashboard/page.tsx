@@ -1,3 +1,5 @@
+// src/app/api/dashboard/page.tsx
+
 "use client";
 
 import { useEffect, useState } from "react";
@@ -38,11 +40,6 @@ export default function DashboardPage() {
   const [error, setError] = useState("");
 
   useEffect(() => {
-    const userId = sessionStorage.getItem("ketchup_dev_user_id");
-    if (!userId) {
-      router.push("/");
-      return;
-    }
     apiGet<UserData>("users/me")
       .then(setData)
       .catch((e) => setError(String(e)))
@@ -94,7 +91,8 @@ export default function DashboardPage() {
             {data.pending_invites.map((inv) => (
               <Group key={inv.id} justify="space-between">
                 <Text>
-                  {inv.inviter_name} invited you to <strong>{inv.group_name}</strong>
+                  {inv.inviter_name} invited you to{" "}
+                  <strong>{inv.group_name}</strong>
                 </Text>
                 <Group gap="xs">
                   <Button
@@ -110,7 +108,10 @@ export default function DashboardPage() {
                     variant="subtle"
                     onClick={async () => {
                       try {
-                        await apiPost(`groups/${inv.group_id}/invite/reject`, {});
+                        await apiPost(
+                          `groups/${inv.group_id}/invite/reject`,
+                          {},
+                        );
                         setData(null);
                         apiGet<UserData>("users/me").then(setData);
                       } catch (e) {
