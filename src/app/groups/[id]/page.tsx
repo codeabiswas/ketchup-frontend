@@ -2,7 +2,7 @@
 
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import {
   Container,
   Title,
@@ -20,49 +20,33 @@ import {
 } from "@mantine/core";
 import { useRouter, useParams } from "next/navigation";
 import Link from "next/link";
-import { apiGet, apiPost, apiPut } from "@/lib/api";
-
-// ── Types ───────────────────────────────────────────────────────────
-interface GroupPreferences {
-  default_location?: string | null;
-  activity_likes?: string[];
-  activity_dislikes?: string[];
-  meetup_frequency?: string | null;
-  budget_preference?: string | null;
-  notes?: string | null;
-}
-
-interface GroupInvite {
-  id: string;
-  email: string;
-  status: string; // "pending" | "accepted" | "rejected" | "expired"
-  created_at: string | null;
-}
-
-interface GroupData {
-  group_id: string;
-  name: string;
-  lead_id: string;
-  is_lead: boolean;
-  members: {
-    id: string;
-    user_id: string;
-    name: string;
-    email: string;
-    role: string;
-  }[];
-  invites: GroupInvite[];
-  max_members: number;
-  slots_remaining: number;
-  current_plans: { round_id: string; iteration: number; status: string }[];
-  events?: { id: string; event_date: string; plan_title: string }[];
-  preferences?: GroupPreferences;
-}
+import {
+  fetchGroup,
+  fetchGroupCommonSlots,
+  generateGroupPlans,
+  inviteGroupMembers,
+  refineGroupPlans,
+  updateGroupPreferences,
+} from "@/features/groups/api";
+import {
+  normalizeGroupPreferences,
+  parseInviteEmails,
+  pendingInvites,
+  toDisplayError,
+  unresolvedDeclineOrExpiryInvites,
+  validateInviteRequest,
+} from "@/features/groups/model";
+import type {
+  CommonSlotsResponse,
+  GroupData,
+  GroupPreferencesForm,
+} from "@/features/groups/types";
 
 export default function GroupPage() {
   const router = useRouter();
   const params = useParams();
   const id = params.id as string;
+
   const [data, setData] = useState<GroupData | null>(null);
   const [loading, setLoading] = useState(true);
   const [generating, setGenerating] = useState(false);
@@ -73,127 +57,90 @@ export default function GroupPage() {
   const [inviting, setInviting] = useState(false);
   const [inviteError, setInviteError] = useState("");
   const [prefsOpen, setPrefsOpen] = useState(false);
-  const [prefs, setPrefs] = useState({
+  const [prefs, setPrefs] = useState<GroupPreferencesForm>({
     default_location: "",
     budget_preference: "",
   });
   const [savingPrefs, setSavingPrefs] = useState(false);
   const [slotsOpen, setSlotsOpen] = useState(false);
-  const [slots, setSlots] = useState<{
-    common_slots: { start: string; end: string }[];
-  } | null>(null);
+  const [slots, setSlots] = useState<CommonSlotsResponse | null>(null);
   const [loadingSlots, setLoadingSlots] = useState(false);
-
-  // ── Track which decline alerts the user has dismissed this session ──
   const [dismissedDeclines, setDismissedDeclines] = useState<Set<string>>(
     new Set(),
   );
 
-  // ── Data fetching ─────────────────────────────────────────────────
-  const refreshGroup = () =>
-    apiGet<GroupData>(`groups/${id}`).then((d) => {
-      setData(d);
-      if (d.preferences) {
-        setPrefs({
-          default_location: d.preferences.default_location ?? "",
-          budget_preference: d.preferences.budget_preference ?? "",
-        });
-      }
-    });
+  const refreshGroup = useCallback(async () => {
+    const group = await fetchGroup(id);
+    setData(group);
+    setPrefs(normalizeGroupPreferences(group.preferences));
+  }, [id]);
+
+  const loadSlots = useCallback(async () => {
+    setLoadingSlots(true);
+    try {
+      const response = await fetchGroupCommonSlots(id);
+      setSlots(response);
+    } catch (err) {
+      setError(toDisplayError(err));
+    } finally {
+      setLoadingSlots(false);
+    }
+  }, [id]);
 
   useEffect(() => {
     refreshGroup()
-      .catch((e) => setError(String(e)))
+      .catch((err) => setError(toDisplayError(err)))
       .finally(() => setLoading(false));
-  }, [id]);
+  }, [refreshGroup]);
 
-  // ── Handlers ──────────────────────────────────────────────────────
   const handleGeneratePlans = async () => {
     setGenerating(true);
     setError("");
     try {
-      const res = await apiPost<{ plan_round_id: string }>(
-        `groups/${id}/generate-plans`,
-        {},
-      );
-      router.push(`/groups/${id}/vote/${res.plan_round_id}`);
-    } catch (e) {
-      setError(String(e));
+      const response = await generateGroupPlans(id);
+      router.push(`/groups/${id}/vote/${response.plan_round_id}`);
+    } catch (err) {
+      setError(toDisplayError(err));
     } finally {
       setGenerating(false);
     }
   };
 
   const handleRefine = async () => {
-    if (!data?.current_plans[0]) return;
+    const activeRound = data?.current_plans[0];
+    if (!activeRound) {
+      return;
+    }
+
     setRefining(true);
     setError("");
     try {
-      const res = await apiPost<{ plan_round_id: string }>(
-        `groups/${id}/plans/${data.current_plans[0].round_id}/refine`,
-        {},
-      );
-      router.push(`/groups/${id}/vote/${res.plan_round_id}`);
-    } catch (e) {
-      setError(String(e));
+      const response = await refineGroupPlans(id, activeRound.round_id);
+      router.push(`/groups/${id}/vote/${response.plan_round_id}`);
+    } catch (err) {
+      setError(toDisplayError(err));
     } finally {
       setRefining(false);
     }
   };
 
   const handleInvite = async () => {
-    const emails = inviteEmails
-      .split(/[,\s]+/)
-      .filter(Boolean)
-      .map((e) => e.trim().toLowerCase());
-
-    if (emails.length === 0) return;
-
-    // ── Client-side capacity check ──────────────────────────────────
-    const slotsAvailable = data?.slots_remaining ?? 0;
-    if (slotsAvailable <= 0) {
-      setInviteError("No slots remaining. The group is full (max 4).");
-      return;
-    }
-    if (emails.length > slotsAvailable) {
-      setInviteError(
-        `Only ${slotsAvailable} slot${slotsAvailable === 1 ? "" : "s"} remaining. Please enter fewer emails.`,
-      );
-      return;
-    }
-
-    // ── Client-side duplicate check ─────────────────────────────────
-    const memberEmails = new Set(
-      data?.members.map((m) => m.email.toLowerCase()) ?? [],
-    );
-    const pendingEmails = new Set(
-      data?.invites
-        .filter((i) => i.status === "pending")
-        .map((i) => i.email.toLowerCase()) ?? [],
-    );
-
-    const dupes: string[] = [];
-    for (const email of emails) {
-      if (memberEmails.has(email)) {
-        dupes.push(`${email} is already a member`);
-      } else if (pendingEmails.has(email)) {
-        dupes.push(`${email} already has a pending invite`);
-      }
-    }
-    if (dupes.length > 0) {
-      setInviteError(dupes.join(". ") + ".");
+    const emails = parseInviteEmails(inviteEmails);
+    const validationError = validateInviteRequest(emails, data);
+    if (validationError) {
+      setInviteError(validationError);
       return;
     }
 
     setInviting(true);
     setInviteError("");
     try {
-      await apiPost(`groups/${id}/invite`, { emails });
+      await inviteGroupMembers(id, emails);
       setInviteOpen(false);
       setInviteEmails("");
-      refreshGroup();
-    } catch (e) {
-      setInviteError(String(e));
+      await refreshGroup();
+    } catch (err) {
+      setInviteError(toDisplayError(err));
     } finally {
       setInviting(false);
     }
@@ -202,18 +149,19 @@ export default function GroupPage() {
   const handleSavePrefs = async () => {
     setSavingPrefs(true);
     try {
-      await apiPut(`groups/${id}/preferences`, {
+      await updateGroupPreferences(id, {
         default_location: prefs.default_location || undefined,
         budget_preference: prefs.budget_preference || undefined,
       });
       setPrefsOpen(false);
-      refreshGroup();
+      await refreshGroup();
+    } catch (err) {
+      setError(toDisplayError(err));
     } finally {
       setSavingPrefs(false);
     }
   };
 
-  // ── Loading / error states ────────────────────────────────────────
   if (loading) {
     return (
       <Container py={60}>
@@ -233,13 +181,11 @@ export default function GroupPage() {
     );
   }
 
-  // ── Derived state ─────────────────────────────────────────────────
   const isLead = data.is_lead;
-  const pendingInvites = data.invites.filter((i) => i.status === "pending");
-  const declinedOrExpired = data.invites.filter(
-    (i) =>
-      (i.status === "rejected" || i.status === "expired") &&
-      !dismissedDeclines.has(i.id),
+  const pendingGroupInvites = pendingInvites(data.invites);
+  const declinedOrExpired = unresolvedDeclineOrExpiryInvites(
+    data.invites,
+    dismissedDeclines,
   );
 
   return (
@@ -259,37 +205,34 @@ export default function GroupPage() {
         </div>
       </Group>
 
-      {/* ── Declined / Expired invite alerts ─────────────────────── */}
       {isLead &&
-        declinedOrExpired.map((inv) => (
+        declinedOrExpired.map((invite) => (
           <Alert
-            key={inv.id}
+            key={invite.id}
             color="orange"
             title={
-              inv.status === "rejected" ? "Invite declined" : "Invite expired"
+              invite.status === "rejected" ? "Invite declined" : "Invite expired"
             }
             mb="sm"
             withCloseButton
             onClose={() =>
-              setDismissedDeclines((prev) => new Set(prev).add(inv.id))
+              setDismissedDeclines((prev) => new Set(prev).add(invite.id))
             }
           >
             <Text size="sm">
-              <strong>{inv.email}</strong>{" "}
-              {inv.status === "rejected"
+              <strong>{invite.email}</strong>{" "}
+              {invite.status === "rejected"
                 ? "declined the invitation."
                 : "did not respond and the invite expired."}{" "}
-              You can invite someone else — the slot is now free.
+              You can invite someone else and use the freed slot.
             </Text>
           </Alert>
         ))}
 
-      {/* ── Members + Invites section ────────────────────────────── */}
       <Paper p="md" mb="xl" withBorder>
         <Group justify="space-between" mb="sm">
           <Group gap="xs">
             <Title order={4}>Members</Title>
-            {/* Slot countdown badge */}
             <Badge
               size="sm"
               variant="light"
@@ -325,21 +268,19 @@ export default function GroupPage() {
           )}
         </Group>
 
-        {/* Active members */}
         <Stack gap="xs">
-          {data.members.map((m) => (
-            <Group key={m.id}>
-              <Text>{m.name || m.email}</Text>
+          {data.members.map((member) => (
+            <Group key={member.id}>
+              <Text>{member.name || member.email}</Text>
               <Badge size="sm" variant="light">
-                {m.role}
+                {member.role}
               </Badge>
             </Group>
           ))}
 
-          {/* Pending invites shown inline so the lead sees who's been invited */}
-          {pendingInvites.map((inv) => (
-            <Group key={inv.id}>
-              <Text c="dimmed">{inv.email}</Text>
+          {pendingGroupInvites.map((invite) => (
+            <Group key={invite.id}>
+              <Text c="dimmed">{invite.email}</Text>
               <Badge size="sm" variant="dot" color="yellow">
                 Invited
               </Badge>
@@ -348,7 +289,6 @@ export default function GroupPage() {
         </Stack>
       </Paper>
 
-      {/* ── My preferences ───────────────────────────────────────── */}
       <Paper p="md" mb="xl" withBorder>
         <Group justify="space-between" mb="sm">
           <Title order={4}>My preferences</Title>
@@ -356,12 +296,7 @@ export default function GroupPage() {
             size="xs"
             variant="subtle"
             onClick={() => {
-              if (data.preferences) {
-                setPrefs({
-                  default_location: data.preferences.default_location ?? "",
-                  budget_preference: data.preferences.budget_preference ?? "",
-                });
-              }
+              setPrefs(normalizeGroupPreferences(data.preferences));
               setPrefsOpen(true);
             }}
           >
@@ -369,10 +304,9 @@ export default function GroupPage() {
           </Button>
         </Group>
         <Text size="sm" c="dimmed" mb="xs">
-          Location & budget preferences for this group
+          Location and budget preferences for this group
         </Text>
-        {data.preferences?.default_location ||
-        data.preferences?.budget_preference ? (
+        {data.preferences?.default_location || data.preferences?.budget_preference ? (
           <Stack gap={4} mt="xs">
             {data.preferences.default_location && (
               <Text size="sm">
@@ -392,7 +326,6 @@ export default function GroupPage() {
         )}
       </Paper>
 
-      {/* ── Common free slots ────────────────────────────────────── */}
       <Paper p="md" mb="xl" withBorder>
         <Group justify="space-between" mb="sm">
           <Title order={4}>Common free slots</Title>
@@ -401,24 +334,14 @@ export default function GroupPage() {
             variant="light"
             onClick={async () => {
               setSlotsOpen(true);
-              setLoadingSlots(true);
-              try {
-                const res = await apiPost<{
-                  common_slots: { start: string; end: string }[];
-                }>(`groups/${id}/availability`, {});
-                setSlots(res);
-              } catch (e) {
-                setError(String(e));
-              } finally {
-                setLoadingSlots(false);
-              }
+              await loadSlots();
             }}
           >
             View slots
           </Button>
         </Group>
         <Text size="sm" c="dimmed">
-          When everyone is free (based on availability blocks)
+          When everyone is free based on availability blocks
         </Text>
       </Paper>
 
@@ -431,30 +354,13 @@ export default function GroupPage() {
           <Loader size="sm" />
         ) : slots?.common_slots && slots.common_slots.length > 0 ? (
           <Stack gap="xs">
-            {slots.common_slots.map((s, i) => (
-              <Text key={i} size="sm">
-                {new Date(s.start).toLocaleString()} –{" "}
-                {new Date(s.end).toLocaleString()}
+            {slots.common_slots.map((slot, index) => (
+              <Text key={index} size="sm">
+                {new Date(slot.start).toLocaleString()} –{" "}
+                {new Date(slot.end).toLocaleString()}
               </Text>
             ))}
-            <Button
-              size="xs"
-              variant="subtle"
-              mt="sm"
-              onClick={async () => {
-                setLoadingSlots(true);
-                try {
-                  const res = await apiPost<{
-                    common_slots: { start: string; end: string }[];
-                  }>(`groups/${id}/availability`, {});
-                  setSlots(res);
-                } catch (e) {
-                  setError(String(e));
-                } finally {
-                  setLoadingSlots(false);
-                }
-              }}
-            >
+            <Button size="xs" variant="subtle" mt="sm" onClick={loadSlots}>
               Refresh
             </Button>
           </Stack>
@@ -464,74 +370,52 @@ export default function GroupPage() {
               No common free slots in the next 7 days.
             </Text>
             <Text size="sm" c="dimmed">
-              Make sure each member has added availability blocks in Settings
-              and clicked &quot;Save availability&quot;. Then click &quot;View
-              slots&quot; again to refresh.
+              Make sure each member added availability in Settings, then refresh.
             </Text>
-            <Button
-              size="xs"
-              variant="light"
-              onClick={async () => {
-                setLoadingSlots(true);
-                try {
-                  const res = await apiPost<{
-                    common_slots: { start: string; end: string }[];
-                  }>(`groups/${id}/availability`, {});
-                  setSlots(res);
-                } catch (e) {
-                  setError(String(e));
-                } finally {
-                  setLoadingSlots(false);
-                }
-              }}
-            >
+            <Button size="xs" variant="light" onClick={loadSlots}>
               Refresh
             </Button>
           </Stack>
         )}
       </Modal>
 
-      {/* ── Upcoming events ──────────────────────────────────────── */}
       {data.events && data.events.length > 0 && (
         <Paper p="md" mb="xl" withBorder>
           <Title order={4} mb="sm">
             Upcoming events
           </Title>
           <Stack gap="xs">
-            {data.events.map((e) => (
-              <Group key={e.id} justify="space-between">
-                <Text size="sm">{e.plan_title}</Text>
-                <Group gap="xs">
-                  <Button
-                    component={Link}
-                    href={`/groups/${id}/events/${e.id}/feedback`}
-                    size="xs"
-                    variant="light"
-                  >
-                    Feedback
-                  </Button>
-                </Group>
+            {data.events.map((event) => (
+              <Group key={event.id} justify="space-between">
+                <Text size="sm">{event.plan_title}</Text>
+                <Button
+                  component={Link}
+                  href={`/groups/${id}/events/${event.id}/feedback`}
+                  size="xs"
+                  variant="light"
+                >
+                  Feedback
+                </Button>
               </Group>
             ))}
           </Stack>
         </Paper>
       )}
 
-      {/* ── Plans ────────────────────────────────────────────────── */}
       <Paper p="md" mb="xl" withBorder>
         <Title order={4} mb="sm">
           Plans
         </Title>
         {data.current_plans.length > 0 ? (
           <Stack gap="xs">
-            {data.current_plans.map((p) => (
-              <Group key={p.round_id} justify="space-between">
+            {data.current_plans.map((round) => (
+              <Group key={round.round_id} justify="space-between">
                 <Text>
-                  Round {p.iteration} - {p.status}
+                  Round {round.iteration} - {round.status}
                 </Text>
                 <Button
                   component={Link}
-                  href={`/groups/${id}/vote/${p.round_id}`}
+                  href={`/groups/${id}/vote/${round.round_id}`}
                   size="sm"
                   variant="light"
                 >
@@ -541,18 +425,17 @@ export default function GroupPage() {
             ))}
           </Stack>
         ) : (
-          <Text c="dimmed">No plans yet. Generate some!</Text>
+          <Text c="dimmed">No plans yet. Generate some.</Text>
         )}
       </Paper>
 
-      {/* ── Action buttons ───────────────────────────────────────── */}
       <Group>
         <Tooltip
           label={
             !isLead
               ? "Only the group lead can generate plans"
               : data.members.length < 2
-                ? "You must have at least 1 more person in the group to start making plans."
+                ? "Add at least one more member to generate plans."
                 : ""
           }
           disabled={isLead && data.members.length >= 2}
@@ -583,7 +466,6 @@ export default function GroupPage() {
         )}
       </Group>
 
-      {/* ── Invite modal ─────────────────────────────────────────── */}
       <Modal
         opened={inviteOpen}
         onClose={() => {
@@ -600,9 +482,9 @@ export default function GroupPage() {
           label={`Emails (comma-separated, max ${data.slots_remaining})`}
           placeholder="friend1@email.com, friend2@email.com"
           value={inviteEmails}
-          onChange={(e) => {
-            setInviteEmails(e.target.value);
-            setInviteError(""); // clear error as they type
+          onChange={(event) => {
+            setInviteEmails(event.target.value);
+            setInviteError("");
           }}
         />
         {inviteError && (
@@ -626,7 +508,6 @@ export default function GroupPage() {
         </Group>
       </Modal>
 
-      {/* ── Preferences modal ────────────────────────────────────── */}
       <Modal
         opened={prefsOpen}
         onClose={() => setPrefsOpen(false)}
@@ -637,16 +518,22 @@ export default function GroupPage() {
             label="Default location"
             placeholder="e.g. Boston, MA"
             value={prefs.default_location}
-            onChange={(e) =>
-              setPrefs({ ...prefs, default_location: e.target.value })
+            onChange={(event) =>
+              setPrefs((prev) => ({
+                ...prev,
+                default_location: event.target.value,
+              }))
             }
           />
           <TextInput
             label="Budget preference"
             placeholder="e.g. $20-40 per person"
             value={prefs.budget_preference}
-            onChange={(e) =>
-              setPrefs({ ...prefs, budget_preference: e.target.value })
+            onChange={(event) =>
+              setPrefs((prev) => ({
+                ...prev,
+                budget_preference: event.target.value,
+              }))
             }
           />
           <Group>
@@ -662,3 +549,4 @@ export default function GroupPage() {
     </Container>
   );
 }
+

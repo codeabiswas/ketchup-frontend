@@ -22,12 +22,11 @@ export function AppShellNav({ children }: { children: React.ReactNode }) {
           <Group>
             <Title
               order={4}
-              component={Link}
-              href="/dashboard"
               c="red.7"
-              style={{ textDecoration: "none" }}
             >
-              🍅 Ketchup
+              <Link href="/dashboard" style={{ textDecoration: "none", color: "inherit" }}>
+                🍅 Ketchup
+              </Link>
             </Title>
             <Group gap="xs" ml="xl">
               <Button

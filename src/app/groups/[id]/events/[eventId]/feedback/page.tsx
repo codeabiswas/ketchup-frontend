@@ -2,22 +2,19 @@
 
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import {
   Container,
   Title,
   Text,
   Button,
   Paper,
-  Stack,
   SegmentedControl,
   Textarea,
-  Loader,
-  Group,
 } from "@mantine/core";
 import { useRouter, useParams } from "next/navigation";
 import Link from "next/link";
-import { apiGet, apiPost } from "@/lib/api";
+import { apiPost } from "@/lib/api";
 
 export default function FeedbackPage() {
   const router = useRouter();
@@ -26,7 +23,6 @@ export default function FeedbackPage() {
   const eventId = params.eventId as string;
   const [rating, setRating] = useState<string>("");
   const [notes, setNotes] = useState("");
-  const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
 

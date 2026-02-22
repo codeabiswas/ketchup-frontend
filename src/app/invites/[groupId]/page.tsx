@@ -34,7 +34,8 @@ export default function InviteActionPage() {
   const searchParams = useSearchParams();
 
   const groupId = params.groupId as string;
-  const action = searchParams.get("action"); // "accept" or "decline"
+  const action = searchParams.get("action"); // "accept" | "decline" | null
+  const normalizedAction = action === "accept" || action === "decline" ? action : null;
 
   const [status, setStatus] = useState<"loading" | "success" | "error">(
     "loading",
@@ -42,22 +43,19 @@ export default function InviteActionPage() {
   const [message, setMessage] = useState("");
 
   useEffect(() => {
-    // Guard: must have a valid action
-    if (action !== "accept" && action !== "decline") {
-      setStatus("error");
-      setMessage("Invalid invite link. Please check the email and try again.");
+    if (!normalizedAction) {
       return;
     }
 
     const endpoint =
-      action === "accept"
+      normalizedAction === "accept"
         ? `groups/${groupId}/invite/accept`
         : `groups/${groupId}/invite/reject`;
 
     apiPost(endpoint, {})
       .then(() => {
         setStatus("success");
-        if (action === "accept") {
+        if (normalizedAction === "accept") {
           setMessage("You've joined the group! Redirecting...");
           setTimeout(() => router.push(`/groups/${groupId}`), 1500);
         } else {
@@ -77,18 +75,23 @@ export default function InviteActionPage() {
           setMessage(msg || "Something went wrong. Please try again.");
         }
       });
-  }, [action, groupId, router]);
+  }, [groupId, normalizedAction, router]);
+
+  const displayStatus = normalizedAction ? status : "error";
+  const displayMessage = normalizedAction
+    ? message
+    : "Invalid invite link. Please check the email and try again.";
 
   return (
     <Container size="sm" py={60}>
       <Paper p="xl" withBorder>
         <Stack align="center" gap="md">
           {/* Loading */}
-          {status === "loading" && (
+          {displayStatus === "loading" && (
             <>
               <Loader color="red" />
               <Title order={3}>
-                {action === "accept"
+                {normalizedAction === "accept"
                   ? "Joining group..."
                   : "Declining invite..."}
               </Title>
@@ -99,22 +102,22 @@ export default function InviteActionPage() {
           )}
 
           {/* Success */}
-          {status === "success" && (
+          {displayStatus === "success" && (
             <>
               <Text style={{ fontSize: 48 }}>
-                {action === "accept" ? "🎉" : "👋"}
+                {normalizedAction === "accept" ? "🎉" : "👋"}
               </Text>
-              <Title order={3}>{message}</Title>
+              <Title order={3}>{displayMessage}</Title>
             </>
           )}
 
           {/* Error */}
-          {status === "error" && (
+          {displayStatus === "error" && (
             <>
               <Text style={{ fontSize: 48 }}>😕</Text>
               <Title order={3}>Couldn&apos;t process invite</Title>
               <Text c="dimmed" ta="center">
-                {message}
+                {displayMessage}
               </Text>
               <Button component={Link} href="/dashboard" color="red" mt="md">
                 Go to Dashboard
