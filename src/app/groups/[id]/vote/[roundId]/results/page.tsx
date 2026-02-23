@@ -1,5 +1,3 @@
-// src/app/groups/[id]/vote/[roundId]/results/page.tsx
-
 "use client";
 
 import { useEffect, useState } from "react";

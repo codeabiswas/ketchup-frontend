@@ -57,3 +57,7 @@ export interface GroupPreferencesForm {
   budget_preference: string;
 }
 
+export interface RefinePlansRequest {
+  descriptors?: string[];
+  lead_note?: string;
+}

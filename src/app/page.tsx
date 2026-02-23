@@ -1,5 +1,3 @@
-// src/app/page.tsx
-
 "use client";
 
 import { Container, Title, Text, Button, Paper, Stack } from "@mantine/core";

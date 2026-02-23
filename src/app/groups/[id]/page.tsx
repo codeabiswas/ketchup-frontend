@@ -1,5 +1,3 @@
-// src/app/groups/[id]/page.tsx
-
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
@@ -17,6 +15,7 @@ import {
   TextInput,
   Tooltip,
   Alert,
+  Checkbox,
 } from "@mantine/core";
 import { useRouter, useParams } from "next/navigation";
 import Link from "next/link";
@@ -32,6 +31,7 @@ import {
   normalizeGroupPreferences,
   parseInviteEmails,
   pendingInvites,
+  REFINE_DESCRIPTOR_OPTIONS,
   toDisplayError,
   unresolvedDeclineOrExpiryInvites,
   validateInviteRequest,
@@ -51,6 +51,9 @@ export default function GroupPage() {
   const [loading, setLoading] = useState(true);
   const [generating, setGenerating] = useState(false);
   const [refining, setRefining] = useState(false);
+  const [refineOpen, setRefineOpen] = useState(false);
+  const [refineDescriptors, setRefineDescriptors] = useState<string[]>([]);
+  const [refineLeadNote, setRefineLeadNote] = useState("");
   const [error, setError] = useState("");
   const [inviteOpen, setInviteOpen] = useState(false);
   const [inviteEmails, setInviteEmails] = useState("");
@@ -115,7 +118,11 @@ export default function GroupPage() {
     setRefining(true);
     setError("");
     try {
-      const response = await refineGroupPlans(id, activeRound.round_id);
+      const response = await refineGroupPlans(id, activeRound.round_id, {
+        descriptors: refineDescriptors,
+        lead_note: refineLeadNote || undefined,
+      });
+      setRefineOpen(false);
       router.push(`/groups/${id}/vote/${response.plan_round_id}`);
     } catch (err) {
       setError(toDisplayError(err));
@@ -456,7 +463,7 @@ export default function GroupPage() {
         </Tooltip>
         {isLead && data.current_plans.length > 0 && (
           <Button
-            onClick={handleRefine}
+            onClick={() => setRefineOpen(true)}
             loading={refining}
             variant="light"
             color="orange"
@@ -546,7 +553,61 @@ export default function GroupPage() {
           </Group>
         </Stack>
       </Modal>
+
+      <Modal
+        opened={refineOpen}
+        onClose={() => setRefineOpen(false)}
+        title="Refine next round"
+      >
+        <Stack gap="sm">
+          <Text size="sm" c="dimmed">
+            Select what to optimize for in the next 5 options. Refine uses lower
+            novelty than Generate, so it keeps more continuity with the current round.
+          </Text>
+          <Stack gap={8}>
+            {REFINE_DESCRIPTOR_OPTIONS.map((option) => (
+              <Checkbox
+                key={option.id}
+                checked={refineDescriptors.includes(option.id)}
+                onChange={(event) => {
+                  const checked = event.currentTarget.checked;
+                  setRefineDescriptors((prev) => {
+                    if (checked) return [...prev, option.id];
+                    return prev.filter((descriptor) => descriptor !== option.id);
+                  });
+                }}
+                label={
+                  <div>
+                    <Text size="sm">{option.label}</Text>
+                    <Text size="xs" c="dimmed">
+                      {option.description}
+                    </Text>
+                  </div>
+                }
+              />
+            ))}
+          </Stack>
+          <TextInput
+            label="Lead note (optional)"
+            placeholder="Any specific direction for this refine round"
+            value={refineLeadNote}
+            onChange={(event) => setRefineLeadNote(event.target.value)}
+          />
+          <Group>
+            <Button onClick={handleRefine} loading={refining} color="orange">
+              Run refine
+            </Button>
+            <Button
+              variant="subtle"
+              onClick={() => {
+                setRefineOpen(false);
+              }}
+            >
+              Cancel
+            </Button>
+          </Group>
+        </Stack>
+      </Modal>
     </Container>
   );
 }
-
