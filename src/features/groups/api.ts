@@ -1,0 +1,46 @@
+import { apiGet, apiPost, apiPut } from "@/lib/api";
+import type { CommonSlotsResponse, GroupData } from "./types";
+
+export async function fetchGroup(groupId: string): Promise<GroupData> {
+  return apiGet<GroupData>(`groups/${groupId}`);
+}
+
+export async function generateGroupPlans(
+  groupId: string,
+): Promise<{ plan_round_id: string }> {
+  return apiPost<{ plan_round_id: string }>(`groups/${groupId}/generate-plans`, {});
+}
+
+export async function refineGroupPlans(
+  groupId: string,
+  roundId: string,
+): Promise<{ plan_round_id: string }> {
+  return apiPost<{ plan_round_id: string }>(
+    `groups/${groupId}/plans/${roundId}/refine`,
+    {},
+  );
+}
+
+export async function inviteGroupMembers(
+  groupId: string,
+  emails: string[],
+): Promise<void> {
+  await apiPost(`groups/${groupId}/invite`, { emails });
+}
+
+export async function updateGroupPreferences(
+  groupId: string,
+  updates: {
+    default_location?: string;
+    budget_preference?: string;
+  },
+): Promise<void> {
+  await apiPut(`groups/${groupId}/preferences`, updates);
+}
+
+export async function fetchGroupCommonSlots(
+  groupId: string,
+): Promise<CommonSlotsResponse> {
+  return apiPost<CommonSlotsResponse>(`groups/${groupId}/availability`, {});
+}
+
