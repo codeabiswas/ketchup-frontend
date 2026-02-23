@@ -1,5 +1,3 @@
-// src/app/settings/page.tsx
-
 "use client";
 
 import { useEffect, useState } from "react";
@@ -43,24 +41,21 @@ export default function SettingsPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
-  // ── Default values for the "Add block" form ───────────────────────
   const [newBlock, setNewBlock] = useState({
     day_of_week: 1,
     start_time: "09:00",
     end_time: "17:00",
-    label: "", // displayed as "Event" in the UI
-    location: "", // optional location per block
+    label: "",
+    location: "",
   });
 
   useEffect(() => {
-    // Load existing availability blocks from the backend
     apiGet<{ blocks: Block[] }>("users/me/availability")
       .then((d) => setBlocks(d.blocks))
       .catch(() => {})
       .finally(() => setLoading(false));
   }, [router]);
 
-  // ── Add a block to the local list (not yet persisted) ─────────────
   const handleAdd = () => {
     setBlocks([
       ...blocks,
@@ -75,12 +70,10 @@ export default function SettingsPage() {
     ]);
   };
 
-  // ── Remove a block from the local list ────────────────────────────
   const handleRemove = (id: string) => {
     setBlocks(blocks.filter((b) => b.id !== id));
   };
 
-  // ── Persist all blocks to the backend ─────────────────────────────
   const handleSave = async () => {
     setSaving(true);
     try {
@@ -93,7 +86,6 @@ export default function SettingsPage() {
           location: b.location || undefined,
         })),
       });
-      // Refresh from server to get real UUIDs back
       apiGet<{ blocks: Block[] }>("users/me/availability").then((d) =>
         setBlocks(d.blocks),
       );
@@ -124,13 +116,11 @@ export default function SettingsPage() {
         find common free slots for your group.
       </Text>
 
-      {/* ── Add a new block ──────────────────────────────────────── */}
       <Paper p="md" mb="md" withBorder>
         <Title order={4} mb="sm">
           Add block
         </Title>
         <Stack gap="sm">
-          {/* Day selector */}
           <Select
             label="Day"
             data={DAYS}
@@ -140,7 +130,6 @@ export default function SettingsPage() {
             }
           />
 
-          {/* Start / End time pickers side-by-side */}
           <Group grow>
             <TextInput
               label="Start"
@@ -160,7 +149,6 @@ export default function SettingsPage() {
             />
           </Group>
 
-          {/* Event — renamed from "Label", still optional */}
           <TextInput
             label="Event (optional)"
             placeholder="e.g. Work, Class, Gym"
@@ -170,7 +158,6 @@ export default function SettingsPage() {
             }
           />
 
-          {/* Location — optional */}
           <TextInput
             label="Location (optional)"
             placeholder="e.g. Snell Library, Home, 360 Huntington Ave"
@@ -186,7 +173,6 @@ export default function SettingsPage() {
         </Stack>
       </Paper>
 
-      {/* ── Existing blocks list ─────────────────────────────────── */}
       <Paper p="md" mb="xl" withBorder>
         <Title order={4} mb="sm">
           Your blocks
@@ -200,14 +186,11 @@ export default function SettingsPage() {
             {blocks.map((b) => (
               <Group key={b.id} justify="space-between">
                 <Text size="sm">
-                  {/* Day name + time range */}
                   {
                     DAYS.find((d) => d.value === String(b.day_of_week))?.label
                   }{" "}
                   {b.start_time}–{b.end_time}
-                  {/* Show event name if provided */}
                   {b.label && ` (${b.label})`}
-                  {/* Show location if provided */}
                   {b.location && ` · 📍 ${b.location}`}
                 </Text>
                 <Button

@@ -1,5 +1,5 @@
 import { apiGet, apiPost, apiPut } from "@/lib/api";
-import type { CommonSlotsResponse, GroupData } from "./types";
+import type { CommonSlotsResponse, GroupData, RefinePlansRequest } from "./types";
 
 export async function fetchGroup(groupId: string): Promise<GroupData> {
   return apiGet<GroupData>(`groups/${groupId}`);
@@ -14,10 +14,11 @@ export async function generateGroupPlans(
 export async function refineGroupPlans(
   groupId: string,
   roundId: string,
+  body?: RefinePlansRequest,
 ): Promise<{ plan_round_id: string }> {
   return apiPost<{ plan_round_id: string }>(
     `groups/${groupId}/plans/${roundId}/refine`,
-    {},
+    body ?? {},
   );
 }
 
@@ -43,4 +44,3 @@ export async function fetchGroupCommonSlots(
 ): Promise<CommonSlotsResponse> {
   return apiPost<CommonSlotsResponse>(`groups/${groupId}/availability`, {});
 }
-

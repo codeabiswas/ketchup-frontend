@@ -1,17 +1,3 @@
-// src/app/invites/[groupId]/page.tsx
-
-/**
- * Invite landing page — where email links point to.
- *
- * Flow:
- *   1. User clicks "Accept" or "Decline" in the invite email
- *   2. Link goes to /invites/{groupId}?action=accept (or decline)
- *   3. Proxy checks auth — if not logged in, redirects to "/"
- *   4. After sign-in, user lands back here
- *   5. This page auto-fires the accept/decline API call
- *   6. Redirects to the group page (accept) or dashboard (decline)
- */
-
 "use client";
 
 import { useEffect, useState } from "react";
@@ -34,7 +20,7 @@ export default function InviteActionPage() {
   const searchParams = useSearchParams();
 
   const groupId = params.groupId as string;
-  const action = searchParams.get("action"); // "accept" | "decline" | null
+  const action = searchParams.get("action");
   const normalizedAction = action === "accept" || action === "decline" ? action : null;
 
   const [status, setStatus] = useState<"loading" | "success" | "error">(
@@ -86,7 +72,6 @@ export default function InviteActionPage() {
     <Container size="sm" py={60}>
       <Paper p="xl" withBorder>
         <Stack align="center" gap="md">
-          {/* Loading */}
           {displayStatus === "loading" && (
             <>
               <Loader color="red" />
@@ -101,7 +86,6 @@ export default function InviteActionPage() {
             </>
           )}
 
-          {/* Success */}
           {displayStatus === "success" && (
             <>
               <Text style={{ fontSize: 48 }}>
@@ -111,7 +95,6 @@ export default function InviteActionPage() {
             </>
           )}
 
-          {/* Error */}
           {displayStatus === "error" && (
             <>
               <Text style={{ fontSize: 48 }}>😕</Text>

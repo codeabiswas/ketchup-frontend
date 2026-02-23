@@ -1,12 +1,4 @@
-// src/lib/api.ts
-
-/**
- * API client — calls Next.js API routes (which proxy to backend).
- *
- * Auth is handled transparently by the proxy: it reads the Auth.js session
- * server-side and injects the X-User-Id header. Client code doesn't need
- * to know anything about authentication.
- */
+/** API helpers that call the frontend proxy routes under `/api`. */
 const API_BASE = "/api";
 
 function parseErrorBody(text: string): string {
@@ -17,7 +9,7 @@ function parseErrorBody(text: string): string {
       return json.detail.map((d: unknown) => String(d)).join("; ");
     if (json.error) return String(json.error);
   } catch {
-    /* not JSON */
+    // Keep raw text when response body is not JSON.
   }
   return text || "Request failed";
 }
@@ -56,14 +48,6 @@ export async function apiPut<T = unknown>(
     method: "PUT",
     headers: { "Content-Type": "application/json" },
     body: body ? JSON.stringify(body) : undefined,
-  });
-  await checkOk(res);
-  return res.json();
-}
-
-export async function apiDelete<T = unknown>(path: string): Promise<T> {
-  const res = await fetch(`${API_BASE}/${path}`, {
-    method: "DELETE",
   });
   await checkOk(res);
   return res.json();

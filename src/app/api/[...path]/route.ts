@@ -1,11 +1,4 @@
-// src/app/api/[...path]/route.ts
-
-/**
- * Next.js API proxy — forwards requests to FastAPI backend.
- *
- * KEY CHANGE: Reads the Auth.js session server-side and injects
- * the X-User-Id header. The browser never sees or sends this header.
- */
+/** Next.js API proxy for backend requests. */
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
 
@@ -52,7 +45,6 @@ async function proxyRequest(
   const pathSegments = path || [];
   const pathStr = pathSegments.join("/");
 
-  // Don't proxy auth routes — Auth.js handles those via [...nextauth]
   if (pathStr.startsWith("auth/")) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
@@ -61,7 +53,6 @@ async function proxyRequest(
   const query = url.searchParams.toString();
   const targetUrl = `${BACKEND_URL}/api/${pathStr}${query ? `?${query}` : ""}`;
 
-  // Read Auth.js session to get the user's backend UUID
   const session = await auth();
   const userId = session?.user?.id;
 
@@ -73,7 +64,6 @@ async function proxyRequest(
     headers["X-Internal-Auth"] = BACKEND_INTERNAL_API_KEY;
   }
 
-  // Inject X-User-Id if user is authenticated
   if (userId) {
     headers["X-User-Id"] = userId;
   }

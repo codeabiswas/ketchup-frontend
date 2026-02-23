@@ -1,5 +1,3 @@
-// src/app/groups/new/page.tsx
-
 "use client";
 
 import { useState } from "react";

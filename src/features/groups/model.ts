@@ -5,6 +5,55 @@ import type {
   GroupPreferencesForm,
 } from "./types";
 
+export interface RefineDescriptorOption {
+  id: string;
+  label: string;
+  description: string;
+}
+
+export const REFINE_DESCRIPTOR_OPTIONS: RefineDescriptorOption[] = [
+  {
+    id: "budget_friendly",
+    label: "More Budget Friendly",
+    description: "Lower per-person cost and prioritize better value.",
+  },
+  {
+    id: "short_travel",
+    label: "Shorter Travel",
+    description: "Reduce travel time and distance for the group.",
+  },
+  {
+    id: "more_active",
+    label: "More Active",
+    description: "Increase physical activity and higher-energy options.",
+  },
+  {
+    id: "more_chill",
+    label: "More Chill",
+    description: "Prefer relaxed, conversation-friendly options.",
+  },
+  {
+    id: "indoor",
+    label: "Indoor Focus",
+    description: "Prioritize indoor and weather-safe venues.",
+  },
+  {
+    id: "outdoor",
+    label: "Outdoor Focus",
+    description: "Prioritize outdoor options when feasible.",
+  },
+  {
+    id: "food_focused",
+    label: "Food Focused",
+    description: "Bias toward meal-centric or tasting experiences.",
+  },
+  {
+    id: "accessible",
+    label: "Easy Logistics",
+    description: "Favor simple, low-friction options for everyone.",
+  },
+]
+
 export function toDisplayError(error: unknown): string {
   if (error instanceof Error) {
     return error.message;
@@ -81,4 +130,3 @@ export function unresolvedDeclineOrExpiryInvites(
       !dismissedInviteIds.has(invite.id),
   );
 }
-

@@ -1,5 +1,3 @@
-// src/app/layout.tsx
-
 import type { Metadata } from "next";
 import { MantineProvider } from "@mantine/core";
 import "@mantine/core/styles.css";

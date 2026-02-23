@@ -1,13 +1,9 @@
-// src/auth.ts — Auth.js v5 configuration
-
 import NextAuth from "next-auth";
 import Google from "next-auth/providers/google";
 
-// The backend URL — inside Docker, this is the service name.
-// Outside Docker, it's localhost.
 const BACKEND_URL = process.env.BACKEND_URL || "http://localhost:8000";
 
-export const { handlers, auth, signIn, signOut } = NextAuth({
+export const { handlers, auth } = NextAuth({
   providers: [
     Google({
       clientId: process.env.GOOGLE_CLIENT_ID!,
@@ -15,13 +11,6 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     }),
   ],
   callbacks: {
-    /**
-     * JWT callback — runs on every token creation/refresh.
-     *
-     * On FIRST sign-in (when `account` and `profile` exist),
-     * we call the backend's google-signin endpoint to upsert
-     * the user and get their stable UUID.
-     */
     async jwt({ token, account, profile }) {
       if (account && profile) {
         try {
@@ -45,10 +34,6 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       return token;
     },
 
-    /**
-     * Session callback — exposes the userId to client components
-     * via useSession() or the session object.
-     */
     async session({ session, token }) {
       if (token.userId) {
         session.user.id = token.userId as string;
@@ -57,6 +42,6 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     },
   },
   pages: {
-    signIn: "/", // Redirect to home page for sign-in
+    signIn: "/",
   },
 });

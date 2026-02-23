@@ -1,5 +1,3 @@
-// src/app/groups/[id]/events/[eventId]/feedback/page.tsx
-
 "use client";
 
 import { useState } from "react";
