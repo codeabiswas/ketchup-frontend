@@ -1,0 +1,32 @@
+{
+  "name": "ketchup-frontend",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev -p 3001",
+    "build": "next build",
+    "start": "next start",
+    "check:routes": "node scripts/check-route-ownership.mjs",
+    "lint": "npm run check:routes && eslint ."
+  },
+  "dependencies": {
+    "@mantine/core": "^8.3.0",
+    "@mantine/dates": "^8.3.0",
+    "@mantine/hooks": "^8.3.0",
+    "next": "16.1.6",
+    "next-auth": "5.0.0-beta.30",
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "eslint": "^9",
+    "eslint-config-next": "16.1.6",
+    "postcss": "^8",
+    "postcss-preset-mantine": "^1.17.0",
+    "postcss-simple-vars": "^7.0.1",
+    "typescript": "^5"
+  }
+}
