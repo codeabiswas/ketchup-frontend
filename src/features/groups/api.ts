@@ -32,8 +32,9 @@ export async function inviteGroupMembers(
 export async function updateGroupPreferences(
   groupId: string,
   updates: {
-    default_location?: string;
     budget_preference?: string;
+    activity_likes?: string[];
+    activity_dislikes?: string[];
   },
 ): Promise<void> {
   await apiPut(`groups/${groupId}/preferences`, updates);

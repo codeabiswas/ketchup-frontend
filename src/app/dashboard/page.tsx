@@ -38,8 +38,18 @@ export default function DashboardPage() {
   const [error, setError] = useState("");
 
   useEffect(() => {
-    apiGet<UserData>("users/me")
-      .then(setData)
+    Promise.all([
+      apiGet<UserData>("users/me"),
+      apiGet<{ blocks: { id: string }[] }>("users/me/availability"),
+    ])
+      .then(([userData, availData]) => {
+        if (availData.blocks.length === 0) {
+          // First-time user: force busy times setup
+          router.push("/settings?onboarding=true");
+          return;
+        }
+        setData(userData);
+      })
       .catch((e) => setError(String(e)))
       .finally(() => setLoading(false));
   }, [router]);

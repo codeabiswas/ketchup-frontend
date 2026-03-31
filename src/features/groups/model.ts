@@ -61,13 +61,41 @@ export function toDisplayError(error: unknown): string {
   return String(error);
 }
 
+export const BUDGET_OPTIONS = [
+  { value: "", label: "Not set" },
+  { value: "Free", label: "Free" },
+  { value: "$1-15 per person", label: "$1–15" },
+  { value: "$15-30 per person", label: "$15–30" },
+  { value: "$30-50 per person", label: "$30–50" },
+  { value: "$50-100 per person", label: "$50–100" },
+  { value: "$100+ per person", label: "$100+" },
+];
+
 export function normalizeGroupPreferences(
   preferences?: GroupPreferences,
 ): GroupPreferencesForm {
   return {
-    default_location: preferences?.default_location ?? "",
     budget_preference: preferences?.budget_preference ?? "",
+    activity_likes: Array.isArray(preferences?.activity_likes) ? preferences.activity_likes.join(", ") : "",
+    activity_dislikes: Array.isArray(preferences?.activity_dislikes) ? preferences.activity_dislikes.join(", ") : "",
   };
+}
+
+export function friendlyRoundStatus(status: string): string {
+  switch (status) {
+    case "voting_open":
+      return "Voting open";
+    case "votes_complete":
+      return "All votes in";
+    case "consensus_reached":
+      return "Event finalized";
+    case "generating":
+      return "Generating...";
+    case "manual_handoff":
+      return "Needs attention";
+    default:
+      return status;
+  }
 }
 
 export function parseInviteEmails(rawEmails: string): string[] {

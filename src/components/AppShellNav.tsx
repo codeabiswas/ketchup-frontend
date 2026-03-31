@@ -41,7 +41,7 @@ export function AppShellNav({ children }: { children: React.ReactNode }) {
                 variant={pathname?.startsWith("/settings") ? "light" : "subtle"}
                 size="sm"
               >
-                Availability
+                Busy Times
               </Button>
             </Group>
           </Group>
