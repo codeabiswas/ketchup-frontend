@@ -13,6 +13,8 @@ import {
   Badge,
   Modal,
   TextInput,
+  Textarea,
+  Select,
   Tooltip,
   Alert,
   Checkbox,
@@ -28,6 +30,8 @@ import {
   updateGroupPreferences,
 } from "@/features/groups/api";
 import {
+  BUDGET_OPTIONS,
+  friendlyRoundStatus,
   normalizeGroupPreferences,
   parseInviteEmails,
   pendingInvites,
@@ -61,8 +65,9 @@ export default function GroupPage() {
   const [inviteError, setInviteError] = useState("");
   const [prefsOpen, setPrefsOpen] = useState(false);
   const [prefs, setPrefs] = useState<GroupPreferencesForm>({
-    default_location: "",
     budget_preference: "",
+    activity_likes: "",
+    activity_dislikes: "",
   });
   const [savingPrefs, setSavingPrefs] = useState(false);
   const [slotsOpen, setSlotsOpen] = useState(false);
@@ -74,6 +79,28 @@ export default function GroupPage() {
 
   const refreshGroup = useCallback(async () => {
     const group = await fetchGroup(id);
+    // Normalise likes/dislikes — backend should return arrays, but guard
+    // against JSON strings or other unexpected types.
+    if (group.preferences) {
+      const safeParse = (v: unknown): string[] => {
+        if (Array.isArray(v)) return v;
+        if (typeof v === "string") {
+          try {
+            const parsed = JSON.parse(v);
+            if (Array.isArray(parsed)) return parsed;
+          } catch {
+            /* not JSON */
+          }
+        }
+        return [];
+      };
+      group.preferences.activity_likes = safeParse(
+        group.preferences.activity_likes,
+      );
+      group.preferences.activity_dislikes = safeParse(
+        group.preferences.activity_dislikes,
+      );
+    }
     setData(group);
     setPrefs(normalizeGroupPreferences(group.preferences));
   }, [id]);
@@ -156,9 +183,18 @@ export default function GroupPage() {
   const handleSavePrefs = async () => {
     setSavingPrefs(true);
     try {
+      const likesArray = prefs.activity_likes
+        .split(",")
+        .map((s) => s.trim())
+        .filter(Boolean);
+      const dislikesArray = prefs.activity_dislikes
+        .split(",")
+        .map((s) => s.trim())
+        .filter(Boolean);
       await updateGroupPreferences(id, {
-        default_location: prefs.default_location || undefined,
         budget_preference: prefs.budget_preference || undefined,
+        activity_likes: likesArray.length > 0 ? likesArray : undefined,
+        activity_dislikes: dislikesArray.length > 0 ? dislikesArray : undefined,
       });
       setPrefsOpen(false);
       await refreshGroup();
@@ -193,6 +229,15 @@ export default function GroupPage() {
   const declinedOrExpired = unresolvedDeclineOrExpiryInvites(
     data.invites,
     dismissedDeclines,
+  );
+
+  // Issue 7: Split events into upcoming vs past.
+  const now = new Date();
+  const upcomingEvents = (data.events ?? []).filter(
+    (e) => new Date(e.event_date) >= now && (e.feedback_count ?? 0) === 0,
+  );
+  const pastEvents = (data.events ?? []).filter(
+    (e) => new Date(e.event_date) < now || (e.feedback_count ?? 0) > 0,
   );
 
   return (
@@ -296,6 +341,7 @@ export default function GroupPage() {
         </Stack>
       </Paper>
 
+      {/* Issue 8: Enhanced preferences with budget dropdown + likes/dislikes */}
       <Paper p="md" mb="xl" withBorder>
         <Group justify="space-between" mb="sm">
           <Title order={4}>My preferences</Title>
@@ -311,18 +357,26 @@ export default function GroupPage() {
           </Button>
         </Group>
         <Text size="sm" c="dimmed" mb="xs">
-          Location and budget preferences for this group
+          Budget and activity preferences for this group.
+          Only you and the AI can see your likes and dislikes.
         </Text>
-        {data.preferences?.default_location || data.preferences?.budget_preference ? (
+        {data.preferences?.budget_preference ||
+        (Array.isArray(data.preferences?.activity_likes) && data.preferences.activity_likes.length > 0) ||
+        (Array.isArray(data.preferences?.activity_dislikes) && data.preferences.activity_dislikes.length > 0) ? (
           <Stack gap={4} mt="xs">
-            {data.preferences.default_location && (
-              <Text size="sm">
-                <strong>Location:</strong> {data.preferences.default_location}
-              </Text>
-            )}
-            {data.preferences.budget_preference && (
+            {data.preferences?.budget_preference && (
               <Text size="sm">
                 <strong>Budget:</strong> {data.preferences.budget_preference}
+              </Text>
+            )}
+            {Array.isArray(data.preferences?.activity_likes) && data.preferences.activity_likes.length > 0 && (
+              <Text size="sm">
+                <strong>Likes:</strong> {data.preferences.activity_likes.join(", ")}
+              </Text>
+            )}
+            {Array.isArray(data.preferences?.activity_dislikes) && data.preferences.activity_dislikes.length > 0 && (
+              <Text size="sm">
+                <strong>Dislikes:</strong> {data.preferences.activity_dislikes.join(", ")}
               </Text>
             )}
           </Stack>
@@ -333,6 +387,7 @@ export default function GroupPage() {
         )}
       </Paper>
 
+      {/* Issues 9 & 10: Weekday-based common free slots */}
       <Paper p="md" mb="xl" withBorder>
         <Group justify="space-between" mb="sm">
           <Title order={4}>Common free slots</Title>
@@ -363,8 +418,7 @@ export default function GroupPage() {
           <Stack gap="xs">
             {slots.common_slots.map((slot, index) => (
               <Text key={index} size="sm">
-                {new Date(slot.start).toLocaleString()} –{" "}
-                {new Date(slot.end).toLocaleString()}
+                <strong>{slot.day_name}</strong> {slot.start_time} – {slot.end_time}
               </Text>
             ))}
             <Button size="xs" variant="subtle" mt="sm" onClick={loadSlots}>
@@ -374,7 +428,7 @@ export default function GroupPage() {
         ) : (
           <Stack gap="xs">
             <Text c="dimmed" size="sm">
-              No common free slots in the next 7 days.
+              No common free slots found.
             </Text>
             <Text size="sm" c="dimmed">
               Make sure each member added availability in Settings, then refresh.
@@ -386,15 +440,27 @@ export default function GroupPage() {
         )}
       </Modal>
 
-      {data.events && data.events.length > 0 && (
+      {/* Issue 7: Upcoming events */}
+      {upcomingEvents.length > 0 && (
         <Paper p="md" mb="xl" withBorder>
           <Title order={4} mb="sm">
             Upcoming events
           </Title>
           <Stack gap="xs">
-            {data.events.map((event) => (
+            {upcomingEvents.map((event) => (
               <Group key={event.id} justify="space-between">
-                <Text size="sm">{event.plan_title}</Text>
+                <div>
+                  <Text size="sm" fw={500}>{event.plan_title}</Text>
+                  <Text size="xs" c="dimmed">
+                    {new Date(event.event_date).toLocaleDateString(undefined, {
+                      weekday: "long",
+                      month: "long",
+                      day: "numeric",
+                      year: "numeric",
+                    })}
+                    {event.location && ` · ${event.location}`}
+                  </Text>
+                </div>
                 <Button
                   component={Link}
                   href={`/groups/${id}/events/${event.id}/feedback`}
@@ -409,6 +475,44 @@ export default function GroupPage() {
         </Paper>
       )}
 
+      {/* Issue 7: Past events */}
+      {pastEvents.length > 0 && (
+        <Paper p="md" mb="xl" withBorder>
+          <Title order={4} mb="sm">
+            Past events
+          </Title>
+          <Stack gap="xs">
+            {pastEvents.map((event) => (
+              <Group key={event.id} justify="space-between">
+                <div>
+                  <Text size="sm" fw={500}>{event.plan_title}</Text>
+                  <Text size="xs" c="dimmed">
+                    {new Date(event.event_date).toLocaleDateString(undefined, {
+                      weekday: "long",
+                      month: "long",
+                      day: "numeric",
+                      year: "numeric",
+                    })}
+                    {event.feedback_count
+                      ? ` · ${event.feedback_count} feedback${event.feedback_count > 1 ? "s" : ""}`
+                      : ""}
+                  </Text>
+                </div>
+                <Button
+                  component={Link}
+                  href={`/groups/${id}/events/${event.id}/feedback`}
+                  size="xs"
+                  variant="subtle"
+                >
+                  {(event.feedback_count ?? 0) > 0 ? "View feedback" : "Leave feedback"}
+                </Button>
+              </Group>
+            ))}
+          </Stack>
+        </Paper>
+      )}
+
+      {/* Issue 5 + Rec B: Plan rounds with friendly status and vote count */}
       <Paper p="md" mb="xl" withBorder>
         <Title order={4} mb="sm">
           Plans
@@ -417,16 +521,27 @@ export default function GroupPage() {
           <Stack gap="xs">
             {data.current_plans.map((round) => (
               <Group key={round.round_id} justify="space-between">
-                <Text>
-                  Round {round.iteration} - {round.status}
-                </Text>
+                <div>
+                  <Text size="sm">
+                    Round {round.iteration} – {friendlyRoundStatus(round.status)}
+                  </Text>
+                  {round.votes_in !== undefined && (
+                    <Text size="xs" c="dimmed">
+                      {round.votes_in}/{data.total_members ?? data.members.length} members voted
+                    </Text>
+                  )}
+                </div>
                 <Button
                   component={Link}
-                  href={`/groups/${id}/vote/${round.round_id}`}
+                  href={
+                    round.status === "votes_complete"
+                      ? `/groups/${id}/vote/${round.round_id}/results`
+                      : `/groups/${id}/vote/${round.round_id}`
+                  }
                   size="sm"
                   variant="light"
                 >
-                  Vote
+                  {round.status === "votes_complete" ? "Results" : "Vote"}
                 </Button>
               </Group>
             ))}
@@ -436,42 +551,43 @@ export default function GroupPage() {
         )}
       </Paper>
 
-      <Group>
-        <Tooltip
-          label={
-            !isLead
-              ? "Only the group lead can generate plans"
-              : data.members.length < 2
-                ? "Add at least one more member to generate plans."
-                : ""
-          }
-          disabled={isLead && data.members.length >= 2}
-          withArrow
-          multiline
-          w={260}
-        >
-          <span>
-            <Button
-              onClick={handleGeneratePlans}
-              loading={generating}
-              color="red"
-              disabled={!isLead || data.members.length < 2}
-            >
-              Generate 5 Plans
-            </Button>
-          </span>
-        </Tooltip>
-        {isLead && data.current_plans.length > 0 && (
-          <Button
-            onClick={() => setRefineOpen(true)}
-            loading={refining}
-            variant="light"
-            color="orange"
+      {/* Plan generation button — hidden when there are upcoming (unfinished) events */}
+      {upcomingEvents.length === 0 && (
+        <Group>
+          <Tooltip
+            label={
+              !isLead
+                ? "Only the group lead can generate plans"
+                : data.members.length < 2
+                  ? "Add at least one more member to generate plans."
+                  : ""
+            }
+            disabled={isLead && data.members.length >= 2}
+            withArrow
+            multiline
+            w={260}
           >
-            Refine (new 5 plans)
-          </Button>
-        )}
-      </Group>
+            <span>
+              <Button
+                onClick={
+                  data.current_plans.length > 0
+                    ? () => setRefineOpen(true)
+                    : handleGeneratePlans
+                }
+                loading={generating || refining}
+                color="red"
+                disabled={!isLead || data.members.length < 2}
+              >
+                {generating
+                  ? "Generating plans... this may take a minute"
+                  : data.current_plans.length > 0
+                    ? "Regenerate 5 Plans"
+                    : "Generate 5 Plans"}
+              </Button>
+            </span>
+          </Tooltip>
+        </Group>
+      )}
 
       <Modal
         opened={inviteOpen}
@@ -515,33 +631,51 @@ export default function GroupPage() {
         </Group>
       </Modal>
 
+      {/* Issue 8: Enhanced preferences modal */}
       <Modal
         opened={prefsOpen}
         onClose={() => setPrefsOpen(false)}
         title="Group preferences"
       >
         <Stack gap="sm">
-          <TextInput
-            label="Default location"
-            placeholder="e.g. Boston, MA"
-            value={prefs.default_location}
-            onChange={(event) =>
-              setPrefs((prev) => ({
-                ...prev,
-                default_location: event.target.value,
-              }))
-            }
-          />
-          <TextInput
+          <Select
             label="Budget preference"
-            placeholder="e.g. $20-40 per person"
+            placeholder="Select budget range"
+            data={BUDGET_OPTIONS}
             value={prefs.budget_preference}
+            onChange={(value) =>
+              setPrefs((prev) => ({
+                ...prev,
+                budget_preference: value ?? "",
+              }))
+            }
+            clearable
+          />
+          <Textarea
+            label="Activity likes"
+            description="Comma-separated list of activities you enjoy"
+            placeholder="e.g. hiking, board games, trying new restaurants"
+            value={prefs.activity_likes}
             onChange={(event) =>
               setPrefs((prev) => ({
                 ...prev,
-                budget_preference: event.target.value,
+                activity_likes: event.target.value,
               }))
             }
+            minRows={2}
+          />
+          <Textarea
+            label="Activity dislikes"
+            description="Comma-separated list of activities you'd rather avoid"
+            placeholder="e.g. loud bars, extreme sports"
+            value={prefs.activity_dislikes}
+            onChange={(event) =>
+              setPrefs((prev) => ({
+                ...prev,
+                activity_dislikes: event.target.value,
+              }))
+            }
+            minRows={2}
           />
           <Group>
             <Button onClick={handleSavePrefs} loading={savingPrefs} color="red">
@@ -557,12 +691,12 @@ export default function GroupPage() {
       <Modal
         opened={refineOpen}
         onClose={() => setRefineOpen(false)}
-        title="Refine next round"
+        title="Regenerate plans"
       >
         <Stack gap="sm">
           <Text size="sm" c="dimmed">
-            Select what to optimize for in the next 5 options. Refine uses lower
-            novelty than Generate, so it keeps more continuity with the current round.
+            Optionally guide the next round of plans. You can skip this and let
+            the AI decide what to try next.
           </Text>
           <Stack gap={8}>
             {REFINE_DESCRIPTOR_OPTIONS.map((option) => (
@@ -589,13 +723,22 @@ export default function GroupPage() {
           </Stack>
           <TextInput
             label="Lead note (optional)"
-            placeholder="Any specific direction for this refine round"
+            placeholder="Any specific direction for this round"
             value={refineLeadNote}
             onChange={(event) => setRefineLeadNote(event.target.value)}
           />
           <Group>
-            <Button onClick={handleRefine} loading={refining} color="orange">
-              Run refine
+            <Button onClick={handleRefine} loading={refining} color="red">
+              Regenerate with guidance
+            </Button>
+            <Button
+              variant="subtle"
+              onClick={() => {
+                setRefineOpen(false);
+                handleGeneratePlans();
+              }}
+            >
+              Skip — just regenerate
             </Button>
             <Button
               variant="subtle"
