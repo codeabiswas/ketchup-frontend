@@ -234,9 +234,16 @@ export default function SettingsPage() {
         })}
       </Accordion>
 
-      <Button onClick={handleSave} loading={saving} color="red">
-        Save busy times
-      </Button>
+      <Group>
+        <Button onClick={handleSave} loading={saving} color="red">
+          Save busy times
+        </Button>
+        {isOnboarding && (
+          <Button variant="subtle" onClick={handleSave} loading={saving}>
+            Skip
+          </Button>
+        )}
+      </Group>
     </Container>
   );
 }

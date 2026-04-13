@@ -22,6 +22,7 @@ interface UserData {
   user_id: string;
   email: string;
   name: string | null;
+  onboarding_completed: boolean;
   groups: { id: string; name: string; role: string }[];
   pending_invites: {
     id: string;
@@ -38,13 +39,9 @@ export default function DashboardPage() {
   const [error, setError] = useState("");
 
   useEffect(() => {
-    Promise.all([
-      apiGet<UserData>("users/me"),
-      apiGet<{ blocks: { id: string }[] }>("users/me/availability"),
-    ])
-      .then(([userData, availData]) => {
-        if (availData.blocks.length === 0) {
-          // First-time user: force busy times setup
+    apiGet<UserData>("users/me")
+      .then((userData) => {
+        if (!userData.onboarding_completed) {
           router.push("/settings?onboarding=true");
           return;
         }
