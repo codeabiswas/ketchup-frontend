@@ -1,0 +1,145 @@
+name: Deploy Frontend to GCP
+
+on:
+  push:
+    branches: [main, staging]
+    paths-ignore:
+      - "**.md"
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: "Override environment (leave blank to use branch default)"
+        required: false
+        type: choice
+        options: ["", dev, prod]
+
+concurrency:
+  group: deploy-frontend-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  PROJECT_ID: ${{ vars.GCP_PROJECT_ID }}
+  REGION: ${{ vars.GCP_REGION }}
+
+jobs:
+  build-and-deploy:
+    name: Build, Push & Deploy Frontend
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      # ── 0. Determine environment from branch ─────────────────────────────
+      - name: Set environment
+        id: env
+        run: |
+          if [ -n "${{ inputs.environment }}" ]; then
+            ENV="${{ inputs.environment }}"
+          elif [ "${{ github.ref_name }}" = "main" ]; then
+            ENV="prod"
+          elif [ "${{ github.ref_name }}" = "staging" ]; then
+            ENV="dev"
+          else
+            ENV="dev"
+          fi
+          echo "environment=$ENV" >> $GITHUB_OUTPUT
+          echo "Deploying to **$ENV** (branch: ${{ github.ref_name }})" >> $GITHUB_STEP_SUMMARY
+
+      # ── 1. Checkout ───────────────────────────────────────────────────────
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # ── 2. Authenticate to GCP ────────────────────────────────────────────
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+
+      - name: Set up Cloud SDK
+        uses: google-github-actions/setup-gcloud@v2
+        with:
+          project_id: ${{ env.PROJECT_ID }}
+
+      # ── 3. Build & push Docker image ──────────────────────────────────────
+      - name: Configure Docker for Artifact Registry
+        run: gcloud auth configure-docker ${{ env.REGION }}-docker.pkg.dev --quiet
+
+      - name: Ensure Artifact Registry repo exists
+        env:
+          ENVIRONMENT: ${{ steps.env.outputs.environment }}
+        run: |
+          gcloud artifacts repositories describe "ketchup-frontend-${ENVIRONMENT}" \
+            --location=${{ env.REGION }} --project=${{ env.PROJECT_ID }} 2>/dev/null \
+          || gcloud artifacts repositories create "ketchup-frontend-${ENVIRONMENT}" \
+            --repository-format=docker \
+            --location=${{ env.REGION }} \
+            --project=${{ env.PROJECT_ID }} \
+            --description="Docker repository for Ketchup Frontend (${ENVIRONMENT})"
+
+      - name: Build and push Docker image
+        id: build
+        env:
+          ENVIRONMENT: ${{ steps.env.outputs.environment }}
+        run: |
+          REGISTRY="${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/ketchup-frontend-${ENVIRONMENT}"
+          IMAGE_SHA="$REGISTRY/ketchup-frontend:${{ github.sha }}"
+          IMAGE_LATEST="$REGISTRY/ketchup-frontend:latest"
+
+          docker build -t "$IMAGE_SHA" -t "$IMAGE_LATEST" .
+          docker push "$IMAGE_SHA"
+          docker push "$IMAGE_LATEST"
+
+          echo "image=$IMAGE_SHA" >> $GITHUB_OUTPUT
+
+      # ── 4. Deploy to Cloud Run ────────────────────────────────────────────
+      - name: Deploy to Cloud Run
+        id: deploy
+        env:
+          ENVIRONMENT: ${{ steps.env.outputs.environment }}
+        run: |
+          # Get the backend URL from the existing backend service
+          BACKEND_URL=$(gcloud run services describe "ketchup-backend-${ENVIRONMENT}" \
+            --region=${{ env.REGION }} --format="value(status.url)" 2>/dev/null || echo "")
+
+          gcloud run deploy "ketchup-frontend-${ENVIRONMENT}" \
+            --image="${{ steps.build.outputs.image }}" \
+            --region=${{ env.REGION }} \
+            --platform=managed \
+            --allow-unauthenticated \
+            --port=3000 \
+            --cpu=1 \
+            --memory=512Mi \
+            --min-instances=0 \
+            --max-instances=3 \
+            --set-env-vars="NODE_ENV=production" \
+            --set-env-vars="BACKEND_URL=${BACKEND_URL}" \
+            --set-env-vars="BACKEND_INTERNAL_API_KEY=${{ secrets.BACKEND_INTERNAL_API_KEY }}" \
+            --set-env-vars="BACKEND_REQUEST_TIMEOUT_MS=360000" \
+            --set-env-vars="AUTH_SECRET=${{ secrets.AUTH_SECRET }}" \
+            --set-env-vars="GOOGLE_CLIENT_ID=${{ secrets.GOOGLE_CLIENT_ID }}" \
+            --set-env-vars="GOOGLE_CLIENT_SECRET=${{ secrets.GOOGLE_CLIENT_SECRET }}" \
+            --set-env-vars="AUTH_TRUST_HOST=true"
+
+          FRONTEND_URL=$(gcloud run services describe "ketchup-frontend-${ENVIRONMENT}" \
+            --region=${{ env.REGION }} --format="value(status.url)")
+          echo "frontend_url=$FRONTEND_URL" >> $GITHUB_OUTPUT
+
+      # ── 5. Update backend CORS to allow frontend origin ───────────────────
+      - name: Update backend FRONTEND_URL
+        env:
+          ENVIRONMENT: ${{ steps.env.outputs.environment }}
+        run: |
+          FRONTEND_URL="${{ steps.deploy.outputs.frontend_url }}"
+          gcloud run services update "ketchup-backend-${ENVIRONMENT}" \
+            --region=${{ env.REGION }} \
+            --update-env-vars="FRONTEND_URL=${FRONTEND_URL}"
+
+      # ── 6. Deployment summary ──────────────────────────────────────────────
+      - name: Deployment summary
+        run: |
+          echo "### Frontend Deployment complete" >> $GITHUB_STEP_SUMMARY
+          echo "**Environment:** ${{ steps.env.outputs.environment }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Frontend URL:** ${{ steps.deploy.outputs.frontend_url }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Image:** ${{ steps.build.outputs.image }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Open: ${{ steps.deploy.outputs.frontend_url }}" >> $GITHUB_STEP_SUMMARY
