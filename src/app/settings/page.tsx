@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import {
   Container,
   Title,
@@ -38,6 +38,14 @@ interface Block {
 }
 
 export default function SettingsPage() {
+  return (
+    <Suspense fallback={<Loader display="block" mx="auto" mt="xl" />}>
+      <SettingsContent />
+    </Suspense>
+  );
+}
+
+function SettingsContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const isOnboarding = searchParams.get("onboarding") === "true";
