@@ -124,6 +124,11 @@ jobs:
             --region=${{ env.REGION }} --format="value(status.url)")
           echo "frontend_url=$FRONTEND_URL" >> $GITHUB_OUTPUT
 
+          # Set AUTH_URL so NextAuth generates correct callback URIs
+          gcloud run services update "ketchup-frontend-${ENVIRONMENT}" \
+            --region=${{ env.REGION }} \
+            --update-env-vars="AUTH_URL=${FRONTEND_URL}"
+
       # ── 5. Update backend CORS to allow frontend origin ───────────────────
       - name: Update backend FRONTEND_URL
         env:
