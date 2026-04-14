@@ -19,12 +19,8 @@ import {
   IconThumbUp,
   IconBrain,
   IconChartBar,
-  IconCalendar,
-  IconLock,
-  IconShield,
-  IconEyeOff,
-  IconTrash,
 } from "@tabler/icons-react";
+import Image from "next/image";
 import { signIn } from "next-auth/react";
 import { CookieConsent } from "@/components/CookieConsent";
 
@@ -33,6 +29,14 @@ function HeroSection() {
     <Box py={80} style={{ backgroundColor: "white" }}>
       <Container size="md">
         <Stack align="center" gap="lg">
+          <Image
+            src="/logo.png"
+            alt="Ketchup"
+            width={280}
+            height={120}
+            priority
+            style={{ objectFit: "contain" }}
+          />
           <Title
             order={1}
             ta="center"
@@ -49,8 +53,8 @@ function HeroSection() {
             maw={560}
             lh={1.6}
           >
-            Ketchup uses AI to generate personalized plans for your group,
-            handles voting, and puts the winner on everyone&apos;s calendar.
+            Ketchup uses AI to generate personalized plans for your group
+            and handles voting so you can catch up without the planning friction.
           </Text>
           <Button
             size="lg"
@@ -104,7 +108,7 @@ const steps = [
     icon: IconThumbUp,
     title: "Vote and go",
     description:
-      "Group ranks options, the winner lands on Google Calendar.",
+      "Group ranks options and the winning plan is finalized automatically.",
   },
 ];
 
@@ -151,12 +155,6 @@ const features = [
     description:
       "Ranked voting so no one person dominates the group chat.",
   },
-  {
-    icon: IconCalendar,
-    title: "Calendar sync",
-    description:
-      "Optional Google Calendar integration — events created automatically.",
-  },
 ];
 
 function FeaturesSection() {
@@ -166,7 +164,7 @@ function FeaturesSection() {
         <Title order={2} ta="center" fw={700} mb={40} c="gray.9">
           Why Ketchup?
         </Title>
-        <SimpleGrid cols={{ base: 1, sm: 3 }} spacing="xl">
+        <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="xl" maw={600} mx="auto">
           {features.map((feature) => (
             <Stack key={feature.title} align="center" gap="sm">
               <ThemeIcon size={48} radius="xl" variant="light">
@@ -181,54 +179,6 @@ function FeaturesSection() {
             </Stack>
           ))}
         </SimpleGrid>
-      </Container>
-    </Box>
-  );
-}
-
-const trustItems = [
-  {
-    icon: IconLock,
-    text: "We only access calendar data you explicitly authorize — and it's optional.",
-  },
-  {
-    icon: IconShield,
-    text: "All data encrypted in transit and at rest.",
-  },
-  {
-    icon: IconEyeOff,
-    text: "We never sell or share your personal information.",
-  },
-  {
-    icon: IconTrash,
-    text: "You can delete your account and all data at any time.",
-  },
-];
-
-function TrustSection() {
-  return (
-    <Box py={60}>
-      <Container size="sm">
-        <Title order={2} ta="center" fw={700} mb={40} c="gray.9">
-          Your data, your control
-        </Title>
-        <Stack gap="lg">
-          {trustItems.map((item) => (
-            <Group key={item.text} gap="md" wrap="nowrap">
-              <ThemeIcon
-                size={40}
-                radius="xl"
-                variant="light"
-                color="gray"
-              >
-                <item.icon size={20} />
-              </ThemeIcon>
-              <Text size="sm" c="gray.7" lh={1.5}>
-                {item.text}
-              </Text>
-            </Group>
-          ))}
-        </Stack>
       </Container>
     </Box>
   );
@@ -271,7 +221,6 @@ export default function HomePage() {
       <HeroSection />
       <HowItWorksSection />
       <FeaturesSection />
-      <TrustSection />
       <Divider color="gray.2" />
       <Footer />
       <CookieConsent />

@@ -13,7 +13,7 @@ import { SessionProvider } from "next-auth/react";
 export const metadata: Metadata = {
   title: "Ketchup - Plan Group Outings Without the Chaos",
   description:
-    "AI-powered social coordination that generates personalized plans, handles group voting, and syncs with Google Calendar.",
+    "AI-powered social coordination that generates personalized plans and handles group voting so friends can catch up.",
 };
 
 export default function RootLayout({
