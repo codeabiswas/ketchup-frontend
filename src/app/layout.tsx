@@ -1,13 +1,19 @@
 import type { Metadata } from "next";
-import { MantineProvider } from "@mantine/core";
+import { MantineProvider, ColorSchemeScript } from "@mantine/core";
 import "@mantine/core/styles.css";
+import "@fontsource/inter/400.css";
+import "@fontsource/inter/600.css";
+import "@fontsource/inter/700.css";
+import "@fontsource/inter/800.css";
 import "../styles/globals.css";
+import { theme } from "@/theme";
 import { AppShellNav } from "@/components/AppShellNav";
 import { SessionProvider } from "next-auth/react";
 
 export const metadata: Metadata = {
-  title: "Ketchup - Social Coordination",
-  description: "AI-powered social coordination for friend groups",
+  title: "Ketchup - Plan Group Outings Without the Chaos",
+  description:
+    "AI-powered social coordination that generates personalized plans, handles group voting, and syncs with Google Calendar.",
 };
 
 export default function RootLayout({
@@ -16,10 +22,13 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en">
+    <html lang="en" suppressHydrationWarning>
+      <head>
+        <ColorSchemeScript defaultColorScheme="light" />
+      </head>
       <body>
         <SessionProvider>
-          <MantineProvider defaultColorScheme="light">
+          <MantineProvider theme={theme} defaultColorScheme="light">
             <AppShellNav>{children}</AppShellNav>
           </MantineProvider>
         </SessionProvider>
