@@ -20,22 +20,24 @@ import {
   IconBrain,
   IconChartBar,
 } from "@tabler/icons-react";
-import Image from "next/image";
 import { signIn } from "next-auth/react";
 import { CookieConsent } from "@/components/CookieConsent";
 
 function HeroSection() {
   return (
-    <Box py={80} style={{ backgroundColor: "white" }}>
+    <Box py={60} style={{ backgroundColor: "white" }}>
       <Container size="md">
-        <Stack align="center" gap="lg">
-          <Image
+        <Stack align="center" gap="md">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
             src="/logo.png"
             alt="Ketchup"
-            width={280}
-            height={120}
-            priority
-            style={{ objectFit: "contain" }}
+            style={{
+              width: "min(400px, 75vw)",
+              height: "auto",
+              display: "block",
+              margin: "-40px 0 -50px 0",
+            }}
           />
           <Title
             order={1}
