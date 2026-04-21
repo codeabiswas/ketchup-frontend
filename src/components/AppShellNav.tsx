@@ -2,31 +2,32 @@
 
 import { usePathname } from "next/navigation";
 import Link from "next/link";
-import { AppShell, Group, Title, Button } from "@mantine/core";
+import { AppShell, Group, Text, Button } from "@mantine/core";
+import { IconSoup } from "@tabler/icons-react";
 import { signOut } from "next-auth/react";
 
 export function AppShellNav({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
 
-  // Don't show nav on the landing page
   if (pathname === "/") {
     return <>{children}</>;
   }
 
   return (
-    <AppShell header={{ height: 56 }} padding="md">
+    <AppShell header={{ height: 60 }} padding="md">
       <AppShell.Header>
-        <Group h="100%" px="md" justify="space-between">
-          <Group>
-            <Title
-              order={4}
-              c="red.7"
+        <Group h="100%" px="lg" justify="space-between">
+          <Group gap="xl">
+            <Link
+              href="/dashboard"
+              style={{ textDecoration: "none", display: "flex", alignItems: "center", gap: 8 }}
             >
-              <Link href="/dashboard" style={{ textDecoration: "none", color: "inherit" }}>
-                🍅 Ketchup
-              </Link>
-            </Title>
-            <Group gap="xs" ml="xl">
+              <IconSoup size={24} color="var(--mantine-color-ketchupRed-6)" />
+              <Text fw={700} size="lg" c="ketchupRed.6">
+                Ketchup
+              </Text>
+            </Link>
+            <Group gap="xs">
               <Button
                 component={Link}
                 href="/dashboard"
@@ -41,7 +42,7 @@ export function AppShellNav({ children }: { children: React.ReactNode }) {
                 variant={pathname?.startsWith("/settings") ? "light" : "subtle"}
                 size="sm"
               >
-                Availability
+                Busy Times
               </Button>
             </Group>
           </Group>

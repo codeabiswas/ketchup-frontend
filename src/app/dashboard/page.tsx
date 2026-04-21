@@ -22,6 +22,7 @@ interface UserData {
   user_id: string;
   email: string;
   name: string | null;
+  onboarding_completed: boolean;
   groups: { id: string; name: string; role: string }[];
   pending_invites: {
     id: string;
@@ -39,7 +40,13 @@ export default function DashboardPage() {
 
   useEffect(() => {
     apiGet<UserData>("users/me")
-      .then(setData)
+      .then((userData) => {
+        if (!userData.onboarding_completed) {
+          router.push("/settings?onboarding=true");
+          return;
+        }
+        setData(userData);
+      })
       .catch((e) => setError(String(e)))
       .finally(() => setLoading(false));
   }, [router]);
